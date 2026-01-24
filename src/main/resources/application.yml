@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gather-service
+
+# Yelp API Configuration
+yelp:
+  api:
+    api-key: ${YELP_API_KEY:your-api-key-here}
+    base-url: https://api.yelp.com/v3
+  job:
+    enabled: true
+    cron: "0 0 9 * * THU"  # Every Thursday at 9:00 AM (for Friday gatherings)
+    default-location: "Seattle, WA"
+    default-term: "bars"
+    search-limit: 50  # Get more results to choose from
+    avoid-repeat-weeks: 12  # Don't repeat spots selected in last 12 weeks
+
+# Firebase Configuration for Push Notifications
+firebase:
+  credentials-path: ${FIREBASE_CREDENTIALS_PATH:classpath:firebase-service-account.json}
+  enabled: ${FIREBASE_ENABLED:true}
+  notification-topic: weekly-gather
+
+# Logging
+logging:
+  level:
+    com.gather: INFO
+    org.springframework.web: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %msg%n"

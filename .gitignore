@@ -71,3 +71,10 @@ bin/
 # Application properties with sensitive data
 application-local.properties
 application-secrets.properties
+
+# Firebase credentials
+src/main/resources/firebase-service-account.json
+firebase-service-account.json
+
+# Environment files
+.env
