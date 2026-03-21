@@ -10,3 +10,5 @@ Gather app is meant to be a mobile application for people to get a weekly push n
 ## Future Expansion
 
 Eventually we will offer an in app chat but this wont be until we get the notification service up and running.
+
+

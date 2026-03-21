@@ -46,16 +46,17 @@ public class GatheringSpotController {
     }
 
     /**
-     * Get recent Yelp IDs for a city (for debugging)
-     * GET /api/gathering-spots/city/{cityId}/recent-ids?weeks=12
+     * Get recent place IDs for a city (for debugging)
+     * GET /api/gathering-spots/city/{cityId}/recent-ids?weeks=12&provider=google
      */
     @GetMapping("/city/{cityId}/recent-ids")
-    public ResponseEntity<List<String>> getRecentYelpIds(
+    public ResponseEntity<List<String>> getRecentPlaceIds(
             @PathVariable String cityId,
-            @RequestParam(defaultValue = "12") int weeks) {
+            @RequestParam(defaultValue = "12") int weeks,
+            @RequestParam(defaultValue = "google") String provider) {
 
-        logger.info("Fetching recent Yelp IDs for city: {} (last {} weeks)", cityId, weeks);
-        List<String> ids = gatheringSpotRepository.findRecentYelpIds(cityId, weeks);
+        logger.info("Fetching recent {} place IDs for city: {} (last {} weeks)", provider, cityId, weeks);
+        List<String> ids = gatheringSpotRepository.findRecentPlaceIds(cityId, provider, weeks);
         return ResponseEntity.ok(ids);
     }
 }

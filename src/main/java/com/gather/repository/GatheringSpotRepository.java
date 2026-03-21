@@ -79,18 +79,20 @@ public class GatheringSpotRepository {
     }
 
     /**
-     * Get Yelp business IDs of recently selected spots for a city
+     * Get provider-specific place IDs of recently selected spots for a city
      * @param cityId The city ID
+     * @param provider The provider name (currently "google", or future providers)
      * @param weeksBack How many weeks back to check
-     * @return List of Yelp business IDs
+     * @return List of provider-specific place IDs
      */
-    public List<String> findRecentYelpIds(String cityId, int weeksBack) {
+    public List<String> findRecentPlaceIds(String cityId, String provider, int weeksBack) {
         long millisecondsBack = (long) weeksBack * 7 * 24 * 60 * 60 * 1000;
         long cutoffTime = System.currentTimeMillis() - millisecondsBack;
 
         try {
             List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
                     .whereEqualTo("cityId", cityId)
+                    .whereEqualTo("provider", provider)
                     .whereGreaterThan("selectedAt", cutoffTime)
                     .get()
                     .get()
@@ -98,10 +100,17 @@ public class GatheringSpotRepository {
 
             return documents.stream()
                     .map(doc -> doc.toObject(GatheringSpot.class))
-                    .map(GatheringSpot::getYelpBusinessId)
+                    .map(spot -> {
+                        if ("google".equals(provider)) {
+                            return spot.getGooglePlaceId();
+                        }
+                        // Add future providers here as needed
+                        return null;
+                    })
+                    .filter(id -> id != null)
                     .collect(Collectors.toList());
         } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error fetching recent Yelp IDs for city: {}", cityId, e);
+            logger.error("Error fetching recent place IDs for provider {} in city: {}", provider, cityId, e);
             Thread.currentThread().interrupt();
             return new ArrayList<>();
         }

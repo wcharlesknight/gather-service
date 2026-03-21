@@ -2,14 +2,14 @@ package com.gather.job;
 
 import com.gather.model.City;
 import com.gather.model.GatheringSpot;
-import com.gather.model.YelpBusiness;
-import com.gather.model.YelpSearchResponse;
+import com.gather.model.Place;
 import com.gather.repository.CityRepository;
 import com.gather.repository.GatheringSpotRepository;
+import com.gather.service.PlaceSearchService;
 import com.gather.service.PushNotificationService;
-import com.gather.service.YelpApiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -18,39 +18,43 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+/**
+ * Generic gathering spot selection job that works with any place search provider.
+ * The active provider is selected via configuration (place-service.active-provider).
+ */
 @Component
-public class YelpDataSyncJob {
-    private static final Logger logger = LoggerFactory.getLogger(YelpDataSyncJob.class);
+public class GatheringSpotSyncJob {
+    private static final Logger logger = LoggerFactory.getLogger(GatheringSpotSyncJob.class);
 
-    private final YelpApiService yelpApiService;
+    private final PlaceSearchService placeSearchService;
     private final PushNotificationService pushNotificationService;
     private final CityRepository cityRepository;
     private final GatheringSpotRepository gatheringSpotRepository;
     private final Random random = new Random();
 
-    @Value("${yelp.job.enabled:true}")
+    @Value("${place-service.job.enabled:true}")
     private boolean jobEnabled;
 
-    @Value("${yelp.job.default-location:San Francisco, CA}")
+    @Value("${place-service.job.default-location:Seattle, WA}")
     private String defaultLocation;
 
-    @Value("${yelp.job.default-term:restaurants}")
+    @Value("${place-service.job.default-term:bars}")
     private String defaultTerm;
 
-    @Value("${yelp.job.search-limit:50}")
+    @Value("${place-service.job.search-limit:50}")
     private int searchLimit;
 
     @Value("${firebase.notification-topic:weekly-gather}")
     private String notificationTopic;
 
-    @Value("${yelp.job.avoid-repeat-weeks:12}")
+    @Value("${place-service.job.avoid-repeat-weeks:12}")
     private int avoidRepeatWeeks;
 
-    public YelpDataSyncJob(YelpApiService yelpApiService,
-                          PushNotificationService pushNotificationService,
-                          CityRepository cityRepository,
-                          GatheringSpotRepository gatheringSpotRepository) {
-        this.yelpApiService = yelpApiService;
+    public GatheringSpotSyncJob(@Qualifier("activePlaceSearchService") PlaceSearchService placeSearchService,
+                               PushNotificationService pushNotificationService,
+                               CityRepository cityRepository,
+                               GatheringSpotRepository gatheringSpotRepository) {
+        this.placeSearchService = placeSearchService;
         this.pushNotificationService = pushNotificationService;
         this.cityRepository = cityRepository;
         this.gatheringSpotRepository = gatheringSpotRepository;
@@ -61,14 +65,15 @@ public class YelpDataSyncJob {
      * Default: Every Thursday at 9:00 AM (notification sent Thursday for Friday gathering)
      * Cron format: second, minute, hour, day of month, month, day of week
      */
-    @Scheduled(cron = "${yelp.job.cron:0 0 9 * * THU}")
+    @Scheduled(cron = "${place-service.job.cron:0 0 9 * * THU}")
     public void selectWeeklyGatheringSpot() {
         if (!jobEnabled) {
             logger.debug("Weekly gathering spot job is disabled");
             return;
         }
 
-        logger.info("Starting weekly gathering spot selection job");
+        logger.info("Starting weekly gathering spot selection job using provider: {}",
+                placeSearchService.getProviderName());
 
         try {
             // Check if we have cities configured in Firestore
@@ -94,11 +99,12 @@ public class YelpDataSyncJob {
      * Process gathering spot selection for a specific city from Firestore
      */
     private void processCity(City city) {
-        logger.info("Processing gathering spot for city: {}", city.getName());
+        logger.info("Processing gathering spot for city: {} using {}", city.getName(),
+                placeSearchService.getProviderName());
 
-        yelpApiService.searchBusinesses(city.getLocation(), city.getSearchTerm(), city.getSearchLimit())
+        placeSearchService.searchPlaces(city.getLocation(), city.getSearchTerm(), city.getSearchLimit())
                 .subscribe(
-                        response -> processAndNotify(response, city.getId(), city.getTopic()),
+                        places -> processAndNotify(places, city.getId(), city.getTopic()),
                         error -> logger.error("Error during gathering spot job for {}: {}",
                                 city.getName(), error.getMessage())
                 );
@@ -108,30 +114,30 @@ public class YelpDataSyncJob {
      * Process with default configuration (fallback)
      */
     private void processDefaultCity() {
-        yelpApiService.searchBusinesses(defaultLocation, defaultTerm, searchLimit)
+        placeSearchService.searchPlaces(defaultLocation, defaultTerm, searchLimit)
                 .subscribe(
-                        response -> processAndNotify(response, null, notificationTopic),
+                        places -> processAndNotify(places, null, notificationTopic),
                         error -> logger.error("Error during weekly gathering spot job: {}", error.getMessage())
                 );
     }
 
     /**
-     * Process the Yelp response and send push notification with random gathering spot
-     * @param response Yelp search response
+     * Process the place search response and send push notification with random gathering spot
+     * @param places List of places from search results
      * @param cityId City ID (null for default configuration)
      * @param topic Firebase topic to send notification to
      */
-    private void processAndNotify(YelpSearchResponse response, String cityId, String topic) {
-        if (response == null || response.getBusinesses() == null || response.getBusinesses().isEmpty()) {
-            logger.warn("No gathering spots found in Yelp response");
+    private void processAndNotify(List<Place> places, String cityId, String topic) {
+        if (places == null || places.isEmpty()) {
+            logger.warn("No gathering spots found in search response");
             return;
         }
 
-        List<YelpBusiness> businesses = response.getBusinesses();
-        logger.info("Retrieved {} potential gathering spots from Yelp", businesses.size());
+        logger.info("Retrieved {} potential gathering spots from {}", places.size(),
+                placeSearchService.getProviderName());
 
         // Select a random gathering spot (avoiding recent repeats if cityId is available)
-        YelpBusiness selectedSpot = selectRandomGatheringSpot(businesses, cityId);
+        Place selectedSpot = selectRandomGatheringSpot(places, cityId);
 
         if (selectedSpot == null) {
             logger.error("Failed to select a gathering spot");
@@ -140,7 +146,7 @@ public class YelpDataSyncJob {
 
         logger.info("Selected weekly gathering spot: {} - {} (Rating: {})",
                 selectedSpot.getName(),
-                selectedSpot.getLocation().getFormattedAddress(),
+                selectedSpot.getAddress(),
                 selectedSpot.getRating());
 
         // Save to Firestore if cityId is available
@@ -171,29 +177,31 @@ public class YelpDataSyncJob {
 
     /**
      * Select a random gathering spot from the list, avoiding recent selections
-     * @param businesses List of potential gathering spots to choose from
+     * @param places List of potential gathering spots to choose from
      * @param cityId City ID (null to skip history check)
      * @return Randomly selected gathering spot
      */
-    private YelpBusiness selectRandomGatheringSpot(List<YelpBusiness> businesses, String cityId) {
-        if (businesses == null || businesses.isEmpty()) {
+    private Place selectRandomGatheringSpot(List<Place> places, String cityId) {
+        if (places == null || places.isEmpty()) {
             return null;
         }
 
         // If cityId is available, filter out recently selected spots
         if (cityId != null) {
             try {
-                List<String> recentYelpIds = gatheringSpotRepository.findRecentYelpIds(cityId, avoidRepeatWeeks);
-                logger.info("Found {} spots selected in last {} weeks", recentYelpIds.size(), avoidRepeatWeeks);
+                String provider = placeSearchService.getProviderName();
+                List<String> recentPlaceIds = gatheringSpotRepository.findRecentPlaceIds(
+                        cityId, provider, avoidRepeatWeeks);
+                logger.info("Found {} spots selected in last {} weeks", recentPlaceIds.size(), avoidRepeatWeeks);
 
                 // Filter out recently selected spots
-                List<YelpBusiness> availableSpots = businesses.stream()
-                        .filter(b -> !recentYelpIds.contains(b.getId()))
+                List<Place> availableSpots = places.stream()
+                        .filter(p -> !recentPlaceIds.contains(p.getProviderId()))
                         .collect(Collectors.toList());
 
                 if (!availableSpots.isEmpty()) {
-                    businesses = availableSpots;
-                    logger.info("Filtered to {} available spots (excluding recent selections)", businesses.size());
+                    places = availableSpots;
+                    logger.info("Filtered to {} available spots (excluding recent selections)", places.size());
                 } else {
                     logger.warn("All spots have been recently selected, using full list");
                 }
@@ -203,11 +211,7 @@ public class YelpDataSyncJob {
         }
 
         // Simple random selection from available spots
-        int randomIndex = random.nextInt(businesses.size());
-        return businesses.get(randomIndex);
-
-        // Future enhancement: Weighted selection based on rating or other criteria
-        // Could favor higher-rated spots or spots with specific attributes
+        int randomIndex = random.nextInt(places.size());
+        return places.get(randomIndex);
     }
 }
-

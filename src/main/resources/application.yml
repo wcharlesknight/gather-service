@@ -5,17 +5,31 @@ spring:
   application:
     name: gather-service
 
-# Yelp API Configuration
-yelp:
-  api:
-    api-key: ${YELP_API_KEY:your-api-key-here}
-    base-url: https://api.yelp.com/v3
+# Google Places API Configuration
+google:
+  places:
+    api:
+      api-key: ${GOOGLE_PLACES_API_KEY:your-api-key-here}
+      base-url: https://places.googleapis.com/v1
+      default-field-mask: "places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.nationalPhoneNumber,places.googleMapsUri,places.priceLevel"
+  job:
+    enabled: false  # Disabled - using generic place-service job instead
+    cron: "0 0 9 * * THU"  # Every Thursday at 9:00 AM (for Friday gatherings)
+    default-location: "Seattle, WA"
+    default-term: "bars"
+    search-limit: 20  # Google Places API max
+    avoid-repeat-weeks: 12  # Don't repeat spots selected in last 12 weeks
+
+# Generic Place Search Service Configuration
+# This allows easy switching between providers (currently: google, or future providers)
+place-service:
+  active-provider: ${PLACE_SERVICE_PROVIDER:google}  # Options: "google" (or future providers)
   job:
     enabled: true
     cron: "0 0 9 * * THU"  # Every Thursday at 9:00 AM (for Friday gatherings)
     default-location: "Seattle, WA"
     default-term: "bars"
-    search-limit: 50  # Get more results to choose from
+    search-limit: 20  # Google Places API max is 20
     avoid-repeat-weeks: 12  # Don't repeat spots selected in last 12 weeks
 
 # Firebase Configuration for Push Notifications

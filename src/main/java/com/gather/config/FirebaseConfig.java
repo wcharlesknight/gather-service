@@ -4,6 +4,7 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.cloud.firestore.Firestore;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.cloud.FirestoreClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +61,15 @@ public class FirebaseConfig {
         Firestore firestore = FirestoreClient.getFirestore(firebaseApp);
         logger.info("Firestore initialized successfully");
         return firestore;
+    }
+
+    @Bean
+    public FirebaseAuth firebaseAuth(FirebaseApp firebaseApp) {
+        if (firebaseApp == null) {
+            logger.warn("Firebase not initialized, FirebaseAuth will not be available");
+            return null;
+        }
+        return FirebaseAuth.getInstance(firebaseApp);
     }
 }
 

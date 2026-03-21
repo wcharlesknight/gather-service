@@ -6,7 +6,11 @@ plugins {
 
 group = 'com.gather'
 version = '1.0.0-SNAPSHOT'
-sourceCompatibility = '17'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
 
 repositories {
     mavenCentral()
@@ -22,9 +26,6 @@ dependencies {
 
     // Firebase Admin SDK for Push Notifications and Firestore Database
     implementation 'com.google.firebase:firebase-admin:9.2.0'
-
-    // Google Cloud Firestore (included in firebase-admin, but explicit for clarity)
-    implementation 'com.google.cloud:google-cloud-firestore:3.14.5'
 
     // JSON Processing
     implementation 'com.fasterxml.jackson.core:jackson-databind'
