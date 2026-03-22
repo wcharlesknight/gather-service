@@ -1,6 +1,6 @@
 package com.gather.repository;
 
-import com.gather.model.City;
+import com.gather.model.domain.CityJobConfig;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import org.slf4j.Logger;
@@ -23,10 +23,7 @@ public class CityRepository {
         this.firestore = firestore;
     }
 
-    /**
-     * Get all enabled cities
-     */
-    public List<City> findAllEnabled() {
+    public List<CityJobConfig> findAllEnabled() {
         try {
             List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
                     .whereEqualTo("enabled", true)
@@ -34,9 +31,9 @@ public class CityRepository {
                     .get()
                     .getDocuments();
 
-            List<City> cities = new ArrayList<>();
+            List<CityJobConfig> cities = new ArrayList<>();
             for (QueryDocumentSnapshot document : documents) {
-                cities.add(document.toObject(City.class));
+                cities.add(document.toObject(CityJobConfig.class));
             }
             return cities;
         } catch (InterruptedException | ExecutionException e) {
@@ -46,16 +43,13 @@ public class CityRepository {
         }
     }
 
-    /**
-     * Get city by ID
-     */
-    public Optional<City> findById(String id) {
+    public Optional<CityJobConfig> findById(String id) {
         try {
-            City city = firestore.collection(COLLECTION_NAME)
+            CityJobConfig city = firestore.collection(COLLECTION_NAME)
                     .document(id)
                     .get()
                     .get()
-                    .toObject(City.class);
+                    .toObject(CityJobConfig.class);
             return Optional.ofNullable(city);
         } catch (InterruptedException | ExecutionException e) {
             logger.error("Error fetching city by ID: {}", id, e);
@@ -64,10 +58,7 @@ public class CityRepository {
         }
     }
 
-    /**
-     * Get city by name
-     */
-    public Optional<City> findByName(String name) {
+    public Optional<CityJobConfig> findByName(String name) {
         try {
             List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
                     .whereEqualTo("name", name)
@@ -79,7 +70,7 @@ public class CityRepository {
             if (documents.isEmpty()) {
                 return Optional.empty();
             }
-            return Optional.of(documents.get(0).toObject(City.class));
+            return Optional.of(documents.get(0).toObject(CityJobConfig.class));
         } catch (InterruptedException | ExecutionException e) {
             logger.error("Error fetching city by name: {}", name, e);
             Thread.currentThread().interrupt();
@@ -87,23 +78,13 @@ public class CityRepository {
         }
     }
 
-    /**
-     * Save or update a city
-     */
-    public City save(City city) {
+    public CityJobConfig save(CityJobConfig city) {
         try {
             if (city.getId() == null) {
-                // Create new document with auto-generated ID
                 city.setCreatedAt(System.currentTimeMillis());
-                firestore.collection(COLLECTION_NAME)
-                        .add(city)
-                        .get();
+                firestore.collection(COLLECTION_NAME).add(city).get();
             } else {
-                // Update existing document
-                firestore.collection(COLLECTION_NAME)
-                        .document(city.getId())
-                        .set(city)
-                        .get();
+                firestore.collection(COLLECTION_NAME).document(city.getId()).set(city).get();
             }
             logger.info("Saved city: {}", city.getName());
             return city;
@@ -114,15 +95,9 @@ public class CityRepository {
         }
     }
 
-    /**
-     * Delete a city
-     */
     public void delete(String id) {
         try {
-            firestore.collection(COLLECTION_NAME)
-                    .document(id)
-                    .delete()
-                    .get();
+            firestore.collection(COLLECTION_NAME).document(id).delete().get();
             logger.info("Deleted city with ID: {}", id);
         } catch (InterruptedException | ExecutionException e) {
             logger.error("Error deleting city: {}", id, e);

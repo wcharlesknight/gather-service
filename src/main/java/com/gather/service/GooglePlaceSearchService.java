@@ -1,7 +1,7 @@
 package com.gather.service;
 
-import com.gather.model.GooglePlace;
-import com.gather.model.Place;
+import com.gather.model.domain.Place;
+import com.gather.model.provider.google.GooglePlace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,7 +29,6 @@ public class GooglePlaceSearchService implements PlaceSearchService {
     public Mono<List<Place>> searchPlaces(String location, String term, int limit) {
         logger.info("Searching Google Places for '{}' in '{}'", term, location);
 
-        // Construct natural language query for Google Places
         String textQuery = term + " in " + location;
 
         return googlePlacesApiService.searchPlaces(textQuery, limit)
@@ -53,9 +52,6 @@ public class GooglePlaceSearchService implements PlaceSearchService {
         return "google";
     }
 
-    /**
-     * Convert GooglePlace to generic Place model
-     */
     private Place convertToPlace(GooglePlace googlePlace) {
         Place place = new Place();
         place.setProviderId(googlePlace.getId());
@@ -73,7 +69,6 @@ public class GooglePlaceSearchService implements PlaceSearchService {
         }
 
         place.setPriceLevel(googlePlace.getPriceLevel());
-
         return place;
     }
 }

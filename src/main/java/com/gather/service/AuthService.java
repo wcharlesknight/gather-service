@@ -1,7 +1,8 @@
 package com.gather.service;
 
-import com.gather.model.AuthResponse;
-import com.gather.model.RegisterRequest;
+import com.gather.exception.InvalidTokenException;
+import com.gather.model.dto.request.RegisterRequest;
+import com.gather.model.dto.response.AuthResponse;
 import com.google.cloud.firestore.FieldValue;
 import com.google.cloud.firestore.Firestore;
 import com.google.firebase.auth.AuthErrorCode;
@@ -96,5 +97,4 @@ public class AuthService {
     }
 
     public static class EmailAlreadyExistsException extends RuntimeException {}
-    public static class InvalidTokenException extends RuntimeException {}
 }

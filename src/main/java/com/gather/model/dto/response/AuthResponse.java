@@ -1,4 +1,4 @@
-package com.gather.model;
+package com.gather.model.dto.response;
 
 import lombok.Builder;
 import lombok.Data;

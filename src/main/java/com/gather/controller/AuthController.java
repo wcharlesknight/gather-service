@@ -1,7 +1,8 @@
 package com.gather.controller;
 
-import com.gather.model.AuthResponse;
-import com.gather.model.RegisterRequest;
+import com.gather.exception.InvalidTokenException;
+import com.gather.model.dto.request.RegisterRequest;
+import com.gather.model.dto.response.AuthResponse;
 import com.gather.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -48,7 +49,7 @@ public class AuthController {
             String idToken = authHeader.substring(7);
             AuthResponse response = authService.login(idToken);
             return ResponseEntity.ok(response);
-        } catch (AuthService.InvalidTokenException e) {
+        } catch (InvalidTokenException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Invalid or expired token."));
         } catch (RuntimeException e) {

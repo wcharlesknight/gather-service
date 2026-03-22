@@ -1,6 +1,6 @@
 package com.gather.repository;
 
-import com.gather.model.GatheringSpot;
+import com.gather.model.domain.GatheringSpot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.Query;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
@@ -24,22 +24,12 @@ public class GatheringSpotRepository {
         this.firestore = firestore;
     }
 
-    /**
-     * Save a gathering spot
-     */
     public GatheringSpot save(GatheringSpot spot) {
         try {
             if (spot.getId() == null) {
-                // Create new document with auto-generated ID
-                firestore.collection(COLLECTION_NAME)
-                        .add(spot)
-                        .get();
+                firestore.collection(COLLECTION_NAME).add(spot).get();
             } else {
-                // Update existing document
-                firestore.collection(COLLECTION_NAME)
-                        .document(spot.getId())
-                        .set(spot)
-                        .get();
+                firestore.collection(COLLECTION_NAME).document(spot.getId()).set(spot).get();
             }
             logger.info("Saved gathering spot: {} for city: {}", spot.getBusinessName(), spot.getCityId());
             return spot;
@@ -50,12 +40,6 @@ public class GatheringSpotRepository {
         }
     }
 
-    /**
-     * Get recent gathering spots for a city
-     * @param cityId The city ID
-     * @param limit Number of recent spots to retrieve
-     * @return List of recent gathering spots
-     */
     public List<GatheringSpot> findRecentByCityId(String cityId, int limit) {
         try {
             List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
@@ -78,13 +62,6 @@ public class GatheringSpotRepository {
         }
     }
 
-    /**
-     * Get provider-specific place IDs of recently selected spots for a city
-     * @param cityId The city ID
-     * @param provider The provider name (currently "google", or future providers)
-     * @param weeksBack How many weeks back to check
-     * @return List of provider-specific place IDs
-     */
     public List<String> findRecentPlaceIds(String cityId, String provider, int weeksBack) {
         long millisecondsBack = (long) weeksBack * 7 * 24 * 60 * 60 * 1000;
         long cutoffTime = System.currentTimeMillis() - millisecondsBack;
@@ -104,7 +81,6 @@ public class GatheringSpotRepository {
                         if ("google".equals(provider)) {
                             return spot.getGooglePlaceId();
                         }
-                        // Add future providers here as needed
                         return null;
                     })
                     .filter(id -> id != null)
@@ -116,9 +92,6 @@ public class GatheringSpotRepository {
         }
     }
 
-    /**
-     * Get all gathering spots for a city
-     */
     public List<GatheringSpot> findAllByCityId(String cityId) {
         try {
             List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
@@ -140,9 +113,6 @@ public class GatheringSpotRepository {
         }
     }
 
-    /**
-     * Update notification sent status
-     */
     public void markNotificationSent(String spotId) {
         try {
             firestore.collection(COLLECTION_NAME)

@@ -1,6 +1,6 @@
 package com.gather.service;
 
-import com.gather.model.Place;
+import com.gather.model.domain.Place;
 import com.google.firebase.messaging.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

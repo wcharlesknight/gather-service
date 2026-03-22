@@ -1,11 +1,18 @@
 package com.gather.controller;
 
-import com.gather.model.City;
-import com.gather.repository.CityRepository;
+import com.gather.model.domain.CityJobConfig;
+import com.gather.service.CityService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -14,66 +21,43 @@ import java.util.List;
 public class CityController {
     private static final Logger logger = LoggerFactory.getLogger(CityController.class);
 
-    private final CityRepository cityRepository;
+    private final CityService cityService;
 
-    public CityController(CityRepository cityRepository) {
-        this.cityRepository = cityRepository;
+    public CityController(CityService cityService) {
+        this.cityService = cityService;
     }
 
-    /**
-     * Get all enabled cities
-     * GET /api/cities
-     */
     @GetMapping
-    public ResponseEntity<List<City>> getAllCities() {
+    public ResponseEntity<List<CityJobConfig>> getAllCities() {
         logger.info("Fetching all enabled cities");
-        List<City> cities = cityRepository.findAllEnabled();
-        return ResponseEntity.ok(cities);
+        return ResponseEntity.ok(cityService.getAllEnabled());
     }
 
-    /**
-     * Get city by ID
-     * GET /api/cities/{id}
-     */
     @GetMapping("/{id}")
-    public ResponseEntity<City> getCityById(@PathVariable String id) {
+    public ResponseEntity<CityJobConfig> getCityById(@PathVariable String id) {
         logger.info("Fetching city with ID: {}", id);
-        return cityRepository.findById(id)
+        return cityService.getById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * Create a new city
-     * POST /api/cities
-     */
     @PostMapping
-    public ResponseEntity<City> createCity(@RequestBody City city) {
+    public ResponseEntity<CityJobConfig> createCity(@RequestBody CityJobConfig city) {
         logger.info("Creating new city: {}", city.getName());
-        City savedCity = cityRepository.save(city);
-        return ResponseEntity.ok(savedCity);
+        return ResponseEntity.ok(cityService.save(city));
     }
 
-    /**
-     * Update a city
-     * PUT /api/cities/{id}
-     */
     @PutMapping("/{id}")
-    public ResponseEntity<City> updateCity(@PathVariable String id, @RequestBody City city) {
+    public ResponseEntity<CityJobConfig> updateCity(@PathVariable String id, @RequestBody CityJobConfig city) {
         logger.info("Updating city with ID: {}", id);
         city.setId(id);
-        City updatedCity = cityRepository.save(city);
-        return ResponseEntity.ok(updatedCity);
+        return ResponseEntity.ok(cityService.save(city));
     }
 
-    /**
-     * Delete a city
-     * DELETE /api/cities/{id}
-     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCity(@PathVariable String id) {
         logger.info("Deleting city with ID: {}", id);
-        cityRepository.delete(id);
+        cityService.delete(id);
         return ResponseEntity.noContent().build();
     }
 }

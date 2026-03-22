@@ -8,10 +8,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Configuration for selecting the active place search provider.
- * Currently supports Google Places, with architecture ready for future providers.
- */
 @Configuration
 public class PlaceSearchServiceConfig {
     private static final Logger logger = LoggerFactory.getLogger(PlaceSearchServiceConfig.class);
@@ -25,9 +21,6 @@ public class PlaceSearchServiceConfig {
         this.googlePlaceSearchService = googlePlaceSearchService;
     }
 
-    /**
-     * Provides the active PlaceSearchService implementation based on configuration
-     */
     @Bean(name = "activePlaceSearchService")
     public PlaceSearchService activePlaceSearchService() {
         if ("google".equalsIgnoreCase(activeProvider)) {

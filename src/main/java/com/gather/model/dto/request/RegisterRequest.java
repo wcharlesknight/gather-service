@@ -1,4 +1,4 @@
-package com.gather.model;
+package com.gather.model.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
