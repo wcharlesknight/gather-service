@@ -11,9 +11,6 @@ public class GatheringSpot {
     private String id;
     private String cityId;
     private String provider;
-    /** @deprecated legacy Yelp field kept for backward compatibility with existing Firestore data */
-    @Deprecated
-    private String yelpBusinessId;
     private String googlePlaceId;
     private String businessName;
     private String address;
