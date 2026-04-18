@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
 @Service
@@ -38,6 +39,9 @@ public class GooglePlacesApiService {
                 .bodyToMono(GooglePlacesSearchResponse.class)
                 .doOnSuccess(response -> logger.info("Successfully retrieved {} places from Google Places API",
                         response.getPlaces() != null ? response.getPlaces().size() : 0))
-                .doOnError(error -> logger.error("Error calling Google Places API: {}", error.getMessage()));
+                .doOnError(WebClientResponseException.class, error ->
+                        logger.error("Error calling Google Places API: {} - {}", error.getMessage(), error.getResponseBodyAsString()))
+                .doOnError(error -> !(error instanceof WebClientResponseException),
+                        error -> logger.error("Error calling Google Places API: {}", error.getMessage()));
     }
 }
