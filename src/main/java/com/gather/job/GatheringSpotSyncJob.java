@@ -70,7 +70,8 @@ public class GatheringSpotSyncJob {
         this.emailService = emailService;
     }
 
-    @Scheduled(cron = "${place-service.job.cron:0 0 9 * * THU}")
+    @Scheduled(cron = "${place-service.job.cron:0 0 9 * * THU}",
+            zone = "${place-service.job.timezone:America/Los_Angeles}")
     public void selectWeeklyGatheringSpot() {
         if (!jobEnabled) {
             logger.debug("Weekly gathering spot job is disabled");
@@ -195,7 +196,8 @@ public class GatheringSpotSyncJob {
         }
     }
 
-    private Place selectRandomGatheringSpot(List<Place> places, String cityId) {
+    // Package-private for unit testing of the selection + repeat-avoidance logic.
+    Place selectRandomGatheringSpot(List<Place> places, String cityId) {
         if (places == null || places.isEmpty()) {
             return null;
         }

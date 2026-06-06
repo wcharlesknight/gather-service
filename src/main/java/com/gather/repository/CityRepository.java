@@ -36,9 +36,12 @@ public class CityRepository {
                 cities.add(document.toObject(CityJobConfig.class));
             }
             return cities;
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error fetching enabled cities", e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.error("Interrupted while fetching enabled cities", e);
+            return new ArrayList<>();
+        } catch (ExecutionException e) {
+            logger.error("Error fetching enabled cities", e);
             return new ArrayList<>();
         }
     }
@@ -51,29 +54,12 @@ public class CityRepository {
                     .get()
                     .toObject(CityJobConfig.class);
             return Optional.ofNullable(city);
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error fetching city by ID: {}", id, e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.error("Interrupted while fetching city by ID: {}", id, e);
             return Optional.empty();
-        }
-    }
-
-    public Optional<CityJobConfig> findByName(String name) {
-        try {
-            List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
-                    .whereEqualTo("name", name)
-                    .limit(1)
-                    .get()
-                    .get()
-                    .getDocuments();
-
-            if (documents.isEmpty()) {
-                return Optional.empty();
-            }
-            return Optional.of(documents.get(0).toObject(CityJobConfig.class));
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error fetching city by name: {}", name, e);
-            Thread.currentThread().interrupt();
+        } catch (ExecutionException e) {
+            logger.error("Error fetching city by ID: {}", id, e);
             return Optional.empty();
         }
     }
@@ -88,9 +74,12 @@ public class CityRepository {
             }
             logger.info("Saved city: {}", city.getName());
             return city;
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error saving city: {}", city.getName(), e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.error("Interrupted while saving city: {}", city.getName(), e);
+            throw new RuntimeException("Failed to save city", e);
+        } catch (ExecutionException e) {
+            logger.error("Error saving city: {}", city.getName(), e);
             throw new RuntimeException("Failed to save city", e);
         }
     }
@@ -99,9 +88,11 @@ public class CityRepository {
         try {
             firestore.collection(COLLECTION_NAME).document(id).delete().get();
             logger.info("Deleted city with ID: {}", id);
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error deleting city: {}", id, e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.error("Interrupted while deleting city: {}", id, e);
+        } catch (ExecutionException e) {
+            logger.error("Error deleting city: {}", id, e);
         }
     }
 }

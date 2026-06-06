@@ -68,7 +68,6 @@ public class GooglePlaceSearchService implements PlaceSearchService {
             place.setLongitude(googlePlace.getLocation().getLongitude());
         }
 
-        place.setPriceLevel(googlePlace.getPriceLevel());
         return place;
     }
 }

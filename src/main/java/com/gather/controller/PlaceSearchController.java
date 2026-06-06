@@ -23,12 +23,16 @@ public class PlaceSearchController {
         this.googlePlaceSearchService = googlePlaceSearchService;
     }
 
+    private static final int MAX_LIMIT = 50;
+
     @GetMapping("/search")
     public Mono<List<Place>> searchPlaces(
             @RequestParam String location,
             @RequestParam String term,
             @RequestParam(defaultValue = "20") int limit) {
+        // Clamp limit: this endpoint proxies a billable upstream API.
+        int safeLimit = Math.max(1, Math.min(limit, MAX_LIMIT));
         logger.info("Searching for '{}' in '{}'", term, location);
-        return googlePlaceSearchService.searchPlaces(location, term, limit);
+        return googlePlaceSearchService.searchPlaces(location, term, safeLimit);
     }
 }

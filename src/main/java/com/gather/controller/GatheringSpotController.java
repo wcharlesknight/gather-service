@@ -34,8 +34,9 @@ public class GatheringSpotController {
     public ResponseEntity<List<GatheringSpot>> getRecentGatheringSpots(
             @PathVariable String cityId,
             @RequestParam(defaultValue = "10") int limit) {
-        logger.info("Fetching {} recent gathering spots for city: {}", limit, cityId);
-        return ResponseEntity.ok(gatheringSpotService.getRecentByCity(cityId, limit));
+        int safeLimit = clamp(limit, 1, MAX_LIMIT);
+        logger.info("Fetching {} recent gathering spots for city: {}", safeLimit, cityId);
+        return ResponseEntity.ok(gatheringSpotService.getRecentByCity(cityId, safeLimit));
     }
 
     @GetMapping("/city/{cityId}/recent-ids")
@@ -43,7 +44,16 @@ public class GatheringSpotController {
             @PathVariable String cityId,
             @RequestParam(defaultValue = "12") int weeks,
             @RequestParam(defaultValue = "google") String provider) {
-        logger.info("Fetching recent {} place IDs for city: {} (last {} weeks)", provider, cityId, weeks);
-        return ResponseEntity.ok(gatheringSpotService.getRecentPlaceIds(cityId, provider, weeks));
+        int safeWeeks = clamp(weeks, 1, MAX_WEEKS);
+        logger.info("Fetching recent {} place IDs for city: {} (last {} weeks)", provider, cityId, safeWeeks);
+        return ResponseEntity.ok(gatheringSpotService.getRecentPlaceIds(cityId, provider, safeWeeks));
+    }
+
+    // Bound client-supplied paging params so a single request can't trigger a huge Firestore read.
+    private static final int MAX_LIMIT = 50;
+    private static final int MAX_WEEKS = 52;
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
     }
 }

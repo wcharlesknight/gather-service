@@ -66,13 +66,14 @@ public class PushNotificationService {
         String title = "📍 This Week's Gather Spot!";
         String body = String.format("Meet Friday at %s - %s", place.getName(), place.getAddress());
 
+        // FCM rejects null values in the data map, so coalesce every entry to a non-null string.
         Map<String, String> data = new HashMap<>();
-        data.put("placeId", place.getProviderId());
-        data.put("provider", place.getProvider());
-        data.put("businessName", place.getName());
-        data.put("rating", String.valueOf(place.getRating()));
-        data.put("address", place.getAddress());
-        data.put("url", place.getUrl());
+        data.put("placeId", nullToEmpty(place.getProviderId()));
+        data.put("provider", nullToEmpty(place.getProvider()));
+        data.put("businessName", nullToEmpty(place.getName()));
+        data.put("rating", place.getRating() != null ? String.valueOf(place.getRating()) : "");
+        data.put("address", nullToEmpty(place.getAddress()));
+        data.put("url", nullToEmpty(place.getUrl()));
         if (place.getLatitude() != null && place.getLongitude() != null) {
             data.put("latitude", String.valueOf(place.getLatitude()));
             data.put("longitude", String.valueOf(place.getLongitude()));
@@ -96,5 +97,9 @@ public class PushNotificationService {
                                 .setChannelId("weekly_recommendations")
                                 .build())
                         .build());
+    }
+
+    private static String nullToEmpty(String value) {
+        return value != null ? value : "";
     }
 }
