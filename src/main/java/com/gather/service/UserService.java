@@ -3,6 +3,7 @@ package com.gather.service;
 import com.gather.exception.InvalidTokenException;
 import com.gather.exception.UnknownCityException;
 import com.gather.model.dto.response.LocationResponse;
+import com.gather.repository.FirestoreAwait;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.FieldValue;
 import com.google.cloud.firestore.Firestore;
@@ -53,7 +54,7 @@ public class UserService {
             updates.put("location", location);
             updates.put("hasCompletedOnboarding", true);
 
-            firestore.collection("users").document(uid).update(updates).get();
+            FirestoreAwait.get(firestore.collection("users").document(uid).update(updates));
 
             logger.info("Location updated for user {}: {}", uid, cityId);
             return city;
@@ -67,11 +68,10 @@ public class UserService {
         String uid = verifyToken(idToken);
 
         try {
-            DocumentSnapshot doc = firestore.collection("users").document(uid).get().get();
+            DocumentSnapshot doc = FirestoreAwait.get(firestore.collection("users").document(uid).get());
             if (doc.exists() && !doc.contains("hasCompletedOnboarding")) {
-                firestore.collection("users").document(uid)
-                        .update("hasCompletedOnboarding", false)
-                        .get();
+                FirestoreAwait.get(firestore.collection("users").document(uid)
+                        .update("hasCompletedOnboarding", false));
                 logger.info("Backfilled hasCompletedOnboarding for user {}", uid);
             }
         } catch (InterruptedException | ExecutionException e) {

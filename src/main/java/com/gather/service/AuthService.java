@@ -3,6 +3,7 @@ package com.gather.service;
 import com.gather.exception.InvalidTokenException;
 import com.gather.model.dto.request.RegisterRequest;
 import com.gather.model.dto.response.AuthResponse;
+import com.gather.repository.FirestoreAwait;
 import com.google.cloud.firestore.FieldValue;
 import com.google.cloud.firestore.Firestore;
 import com.google.firebase.auth.AuthErrorCode;
@@ -48,7 +49,7 @@ public class AuthService {
                 userDoc.put("createdAt", FieldValue.serverTimestamp());
                 userDoc.put("lastLoginAt", FieldValue.serverTimestamp());
                 userDoc.put("hasCompletedOnboarding", false);
-                firestore.collection("users").document(uid).set(userDoc).get();
+                FirestoreAwait.get(firestore.collection("users").document(uid).set(userDoc));
             } catch (InterruptedException | ExecutionException e) {
                 // The Auth user exists but the profile write failed. Roll back the Auth user so
                 // the email is freed and the client can retry, instead of being stuck at 409.
@@ -95,7 +96,7 @@ public class AuthService {
 
             Map<String, Object> updates = new HashMap<>();
             updates.put("lastLoginAt", FieldValue.serverTimestamp());
-            firestore.collection("users").document(uid).update(updates).get();
+            FirestoreAwait.get(firestore.collection("users").document(uid).update(updates));
 
             logger.info("User login recorded: {}", uid);
             return AuthResponse.builder()

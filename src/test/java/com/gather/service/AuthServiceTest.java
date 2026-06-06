@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -70,7 +71,7 @@ class AuthServiceTest {
         stubFirestoreUsersDoc("uid123");
         ApiFuture<WriteResult> future = mock(ApiFuture.class);
         when(userDoc.set(any())).thenReturn(future);
-        when(future.get()).thenReturn(mock(WriteResult.class));
+        when(future.get(anyLong(), any())).thenReturn(mock(WriteResult.class));
 
         AuthResponse response = authService.register(registerRequest());
 
@@ -100,7 +101,7 @@ class AuthServiceTest {
         stubFirestoreUsersDoc("uid123");
         ApiFuture<WriteResult> future = mock(ApiFuture.class);
         when(userDoc.set(any())).thenReturn(future);
-        when(future.get()).thenThrow(new ExecutionException(new RuntimeException("firestore down")));
+        when(future.get(anyLong(), any())).thenThrow(new ExecutionException(new RuntimeException("firestore down")));
 
         assertThatThrownBy(() -> authService.register(registerRequest()))
                 .isInstanceOf(RuntimeException.class);
@@ -121,7 +122,7 @@ class AuthServiceTest {
         stubFirestoreUsersDoc("uid123");
         ApiFuture<WriteResult> future = mock(ApiFuture.class);
         when(userDoc.update(anyMap())).thenReturn(future);
-        when(future.get()).thenReturn(mock(WriteResult.class));
+        when(future.get(anyLong(), any())).thenReturn(mock(WriteResult.class));
 
         AuthResponse response = authService.login("id-token");
 

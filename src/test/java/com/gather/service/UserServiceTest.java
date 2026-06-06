@@ -19,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -53,7 +55,7 @@ class UserServiceTest {
         when(users.document("uid123")).thenReturn(userDoc);
         ApiFuture<WriteResult> future = mock(ApiFuture.class);
         when(userDoc.update(anyMap())).thenReturn(future);
-        when(future.get()).thenReturn(mock(WriteResult.class));
+        when(future.get(anyLong(), any())).thenReturn(mock(WriteResult.class));
 
         LocationResponse response = userService.updateLocation("id-token", "seattle");
 
