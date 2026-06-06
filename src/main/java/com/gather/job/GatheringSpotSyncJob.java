@@ -4,27 +4,30 @@ import com.gather.model.domain.CityJobConfig;
 import com.gather.model.domain.GatheringSpot;
 import com.gather.model.domain.Place;
 import com.gather.model.domain.UserProfile;
-import com.gather.repository.CityRepository;
-import com.gather.repository.GatheringSpotRepository;
-import com.gather.repository.UserRepository;
+import com.gather.service.CityService;
 import com.gather.service.EmailService;
+import com.gather.service.GatheringSpotService;
 import com.gather.service.PlaceSearchService;
 import com.gather.service.PushNotificationService;
+import com.gather.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import reactor.core.scheduler.Schedulers;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Random;
-import java.util.stream.Collectors;
 
 /**
  * Weekly job that selects a gathering spot per city and notifies users.
  * Active provider is selected via configuration (place-service.active-provider).
+ *
+ * <p>Runs synchronously: each city's place search is blocked on (this executes on the scheduler /
+ * admin-trigger thread, not a reactive pipeline), so errors propagate to {@link #selectWeeklyGatheringSpot()}
+ * and the method only returns once all work is done.
  */
 @Component
 public class GatheringSpotSyncJob {
@@ -32,9 +35,9 @@ public class GatheringSpotSyncJob {
 
     private final PlaceSearchService placeSearchService;
     private final PushNotificationService pushNotificationService;
-    private final CityRepository cityRepository;
-    private final GatheringSpotRepository gatheringSpotRepository;
-    private final UserRepository userRepository;
+    private final CityService cityService;
+    private final GatheringSpotService gatheringSpotService;
+    private final UserService userService;
     private final EmailService emailService;
     private final Random random = new Random();
 
@@ -58,15 +61,15 @@ public class GatheringSpotSyncJob {
 
     public GatheringSpotSyncJob(@Qualifier("activePlaceSearchService") PlaceSearchService placeSearchService,
                                 PushNotificationService pushNotificationService,
-                                CityRepository cityRepository,
-                                GatheringSpotRepository gatheringSpotRepository,
-                                UserRepository userRepository,
+                                CityService cityService,
+                                GatheringSpotService gatheringSpotService,
+                                UserService userService,
                                 EmailService emailService) {
         this.placeSearchService = placeSearchService;
         this.pushNotificationService = pushNotificationService;
-        this.cityRepository = cityRepository;
-        this.gatheringSpotRepository = gatheringSpotRepository;
-        this.userRepository = userRepository;
+        this.cityService = cityService;
+        this.gatheringSpotService = gatheringSpotService;
+        this.userService = userService;
         this.emailService = emailService;
     }
 
@@ -82,8 +85,8 @@ public class GatheringSpotSyncJob {
                 placeSearchService.getProviderName());
 
         try {
-            List<CityJobConfig> enabledCities = cityRepository.findAllEnabled();
-            
+            List<CityJobConfig> enabledCities = cityService.getAllEnabled();
+
             if (!enabledCities.isEmpty()) {
                 logger.info("Found {} enabled cities in Firestore", enabledCities.size());
                 for (CityJobConfig city : enabledCities) {
@@ -103,22 +106,23 @@ public class GatheringSpotSyncJob {
                 placeSearchService.getProviderName());
 
         int limit = city.getSearchLimit() != null ? city.getSearchLimit() : searchLimit;
-        placeSearchService.searchPlaces(city.getLocation(), city.getSearchTerm(), limit)
-                .publishOn(Schedulers.boundedElastic())
-                .subscribe(
-                        places -> processAndNotify(places, city.getCityId(), city.getTopic()),
-                        error -> logger.error("Error during gathering spot job for {}: {}",
-                                city.getName(), error.getMessage())
-                );
+        List<Place> places = searchPlaces(city.getLocation(), city.getSearchTerm(), limit);
+        processAndNotify(places, city.getCityId(), city.getTopic());
     }
 
     private void processDefaultCity() {
-        placeSearchService.searchPlaces(defaultLocation, defaultTerm, searchLimit)
-                .publishOn(Schedulers.boundedElastic())
-                .subscribe(
-                        places -> processAndNotify(places, null, notificationTopic),
-                        error -> logger.error("Error during weekly gathering spot job: {}", error.getMessage())
-                );
+        List<Place> places = searchPlaces(defaultLocation, defaultTerm, searchLimit);
+        processAndNotify(places, null, notificationTopic);
+    }
+
+    private List<Place> searchPlaces(String location, String term, int limit) {
+        return placeSearchService.searchPlaces(location, term, limit)
+                .onErrorResume(error -> {
+                    logger.error("Place search failed for '{}' in '{}': {}", term, location, error.getMessage());
+                    return Mono.just(List.of());
+                })
+                .blockOptional()
+                .orElseGet(List::of);
     }
 
     private void processAndNotify(List<Place> places, String cityId, String topic) {
@@ -143,8 +147,7 @@ public class GatheringSpotSyncJob {
         GatheringSpot gatheringSpot = null;
         if (cityId != null) {
             try {
-                gatheringSpot = new GatheringSpot(cityId, selectedSpot);
-                gatheringSpotRepository.save(gatheringSpot);
+                gatheringSpot = gatheringSpotService.save(new GatheringSpot(cityId, selectedSpot));
                 logger.info("Saved gathering spot to Firestore");
             } catch (Exception e) {
                 logger.error("Failed to save gathering spot to Firestore", e);
@@ -154,7 +157,7 @@ public class GatheringSpotSyncJob {
         notifyUsers(selectedSpot, cityId, topic);
 
         if (gatheringSpot != null && gatheringSpot.getId() != null) {
-            gatheringSpotRepository.markNotificationSent(gatheringSpot.getId());
+            gatheringSpotService.markNotificationSent(gatheringSpot.getId());
         }
     }
 
@@ -165,7 +168,7 @@ public class GatheringSpotSyncJob {
             return;
         }
 
-        List<UserProfile> users = userRepository.findByCityId(cityId);
+        List<UserProfile> users = userService.findByCityId(cityId);
 
         if (users.isEmpty()) {
             logger.info("No users found for city {}, falling back to topic broadcast", cityId);
@@ -185,7 +188,7 @@ public class GatheringSpotSyncJob {
                 try {
                     emailService.sendGatheringSpotEmail(place, user.getEmail(), user.getDisplayName());
                 } catch (Exception e) {
-                    logger.error("Failed to send email to {}: {}", user.getEmail(), e.getMessage());
+                    logger.error("Failed to send email to a user: {}", e.getMessage());
                 }
             }
         }
@@ -205,13 +208,13 @@ public class GatheringSpotSyncJob {
         if (cityId != null) {
             try {
                 String provider = placeSearchService.getProviderName();
-                List<String> recentPlaceIds = gatheringSpotRepository.findRecentPlaceIds(
+                List<String> recentPlaceIds = gatheringSpotService.getRecentPlaceIds(
                         cityId, provider, avoidRepeatWeeks);
                 logger.info("Found {} spots selected in last {} weeks", recentPlaceIds.size(), avoidRepeatWeeks);
 
                 List<Place> availableSpots = places.stream()
                         .filter(p -> !recentPlaceIds.contains(p.getProviderId()))
-                        .collect(Collectors.toList());
+                        .toList();
 
                 if (!availableSpots.isEmpty()) {
                     places = availableSpots;
