@@ -1,6 +1,7 @@
 package com.gather.repository;
 
 import com.gather.model.domain.GatheringSpot;
+import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.Query;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
@@ -27,7 +28,10 @@ public class GatheringSpotRepository {
     public GatheringSpot save(GatheringSpot spot) {
         try {
             if (spot.getId() == null) {
-                firestore.collection(COLLECTION_NAME).add(spot).get();
+                // add() returns the reference to the new auto-ID document; capture it so the
+                // caller (e.g. markNotificationSent) has the persisted document ID.
+                DocumentReference ref = firestore.collection(COLLECTION_NAME).add(spot).get();
+                spot.setId(ref.getId());
             } else {
                 firestore.collection(COLLECTION_NAME).document(spot.getId()).set(spot).get();
             }

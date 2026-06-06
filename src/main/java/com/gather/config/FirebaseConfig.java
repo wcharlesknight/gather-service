@@ -46,8 +46,11 @@ public class FirebaseConfig {
                 return FirebaseApp.getInstance();
             }
         } catch (IOException e) {
-            logger.error("Failed to initialize Firebase. Push notifications and Firestore will be disabled.", e);
-            return null;
+            // Firebase is enabled but its credentials could not be loaded. Fail fast at startup
+            // rather than registering null beans that NPE on first use at request time.
+            throw new IllegalStateException(
+                    "Failed to initialize Firebase from credentials '" + credentialsResource
+                            + "'. Set firebase.enabled=false to run without Firebase.", e);
         }
     }
 

@@ -1,0 +1,31 @@
+id,severity,category,title,location,reviewer,confidence,recommended_action,risk_if_unfixed,effort
+C1,CRITICAL,security,Admin job-trigger endpoint unauthenticated and on by default,controller/AdminJobController.java:16;26,security+bugs,verified,Require admin auth; default flag false,Remote trigger of billable job + mass push/email spam,S
+C2,CRITICAL,security,City create/update/delete endpoints unauthenticated,controller/CityController.java:44-62,security,verified,Gate writes behind verified token + admin claim,Anyone can disable/hijack the weekly job,S
+C3,CRITICAL,bug,Saved spot ID never captured; markNotificationSent is a no-op,repository/GatheringSpotRepository.java:30,bugs,verified,Capture DocumentReference and setId,notificationSent never written; idempotency/state corruption,S
+C4,CRITICAL,bug,FirebaseConfig returns null beans causing NPE cascade,config/FirebaseConfig.java:32;50;58;72,bugs+quality,verified,ConditionalOnProperty beans + fail-fast on IOException,NPE on first call when disabled or creds fail,M
+H1,HIGH,security,No SecurityFilterChain; ad-hoc per-controller auth,build.gradle;app-wide,security,verified,Add Spring Security + Firebase token filter + authorizeHttpRequests,Root cause of C1/C2; new routes public by default,L
+H2,HIGH,bug,Weekly job fire-and-forget subscribe; errors swallowed,job/GatheringSpotSyncJob.java,bugs+quality,high,Block on reactive pipeline; doOnError/onErrorResume,Job reports success before work done; lost errors,M
+H3,HIGH,bug,Firestore ApiFuture.get() with no timeout,repositories;AuthService;UserService,bugs,high,Use get(30,SECONDS); catch TimeoutException,Threads block forever; scheduler pool exhaustion,M
+H4,HIGH,bug,register() orphans Auth user if Firestore write fails,service/AuthService.java:41-50,bugs+quality,high,Delete Auth user on Firestore failure (compensating),User permanently stuck at 409 EMAIL_ALREADY_EXISTS,S
+H5,HIGH,security,Firebase ID tokens not checked for revocation,service/AuthService.java:76;service/UserService.java:85,security,verified,verifyIdToken(token,true); handle revoked/disabled,Stolen unexpired token works after sign-out,S
+H6,HIGH,quality,Zero automated tests,src/test (empty),quality,verified,Add unit tests for job/services + WebMvcTest slices,No safety net for any refactor,L
+H7,HIGH,bug,Null values passed into FCM data map,service/PushNotificationService.java:70-75,bugs,high,Coalesce null to empty string,IllegalArgumentException at push time,S
+M1,MEDIUM,quality,No global RestControllerAdvice; inconsistent error handling,project-wide,quality,verified,Add one RestControllerAdvice; remove controller try/catch,Inconsistent API error contract,M
+M2,MEDIUM,security,Email HTML built by string concat (injection/XSS),service/EmailService.java:59-66,security+bugs,verified,HTML-escape interpolated values; https-only url,Attacker-controlled HTML in user inboxes,S
+M3,MEDIUM,security,Mass-assignment via CityJobConfig domain as request body,controller/CityController.java:45;51,security+quality,verified,Request DTO + @Valid; server-set managed fields,Clients set createdAt/enabled/cron arbitrarily,S
+M4,MEDIUM,security,Unbounded limit/weeks query params,controller/GatheringSpotController.java:36;44;PlaceSearchController,security,verified,Clamp + @Min/@Max; authenticate places search,Costly/full-scan reads; billable API abuse,S
+M5,MEDIUM,bug,Weekly cron has no timezone,application.yml:31;GatheringSpotSyncJob @Scheduled,bugs,verified,Set zone=America/Los_Angeles,Notification fires at wrong local time on UTC infra,S
+M6,MEDIUM,bug,Interrupt flag mishandled in multi-catch,repository/CityRepository.java:39-43;service/AuthService.java:68;93,bugs+quality,verified,Split catches; restore flag only for InterruptedException,Spurious interrupt can disrupt scheduled executor,S
+M7,MEDIUM,quality,Weekly job bypasses service layer,job/GatheringSpotSyncJob.java:36-38,quality,verified,Route data access through services,Untestable fat job; duplicated logic,M
+M8,MEDIUM,quality,CityRegistry hard-codes cities; diverges from Firestore,service/CityRegistry.java:11-28,quality,verified,Validate against CityRepository or load at startup,User cannot select a Firestore-added city,M
+M9,MEDIUM,quality,Provider abstraction broken end-to-end,PlaceSearchServiceConfig.java:25-33;PlaceSearchController.java:22;GatheringSpot.java:13;27-29;GatheringSpotRepository.java:84-92,quality+bugs,verified,Resolve by provider name; @Qualifier; rename googlePlaceId->placeId (schema migration),Repeat-avoidance silently disabled for future providers,M
+M10,MEDIUM,security,PII (email/uid) logged at INFO,EmailService.java;AuthService.java:54;83;UserService.java:58,security,verified,Mask/drop email; uid at DEBUG,PII in plaintext logs,S
+M11,MEDIUM,security,No CORS configuration for LoopIn origin,app-wide,security,verified,Configure CorsConfigurationSource allowlist,Implicit origin handling; no central control,S
+L1,LOW,dead-code,Dead google.job.* config block,application.yml:15-21,dead-code+quality,confirmed,Delete block,Misleading divergent config,S
+L2,LOW,dead-code,Unused method CityRepository.findByName(),repository/CityRepository.java:61-79,dead-code,confirmed,Delete method,Dead code,S
+L3,LOW,dead-code,Unused fields Place.id and Place.priceLevel,model/domain/Place.java:11;22,dead-code,confirmed,Delete fields (and field mask),Dead code,S
+L4,LOW,dead-code,GatheringSpot.phoneNumber set but never read,model/domain/GatheringSpot.java:21,dead-code,confirmed,Investigate then keep/remove,Dead data write,S
+L5,LOW,quality,Resend client instantiated per email send,service/EmailService.java:36,quality,verified,Create once in constructor,Wasteful; no connection pooling,S
+L6,LOW,quality,Java 21 modernization (records / Map.of / .toList()),AuthResponse;LocationResponse;HealthController:17-19;multiple,quality,verified,Adopt records + modern idioms,Boilerplate; outdated style,M
+L7,LOW,quality,GooglePlacesApiConfig hand-written getters/setters,config/GooglePlacesApiConfig.java,quality,verified,Use Lombok @Data or constructor binding,Boilerplate,S
+L8,LOW,quality,No dev/prod profile separation,application.yml,quality,verified,Add application-dev.yml,Local startup not zero-config,S

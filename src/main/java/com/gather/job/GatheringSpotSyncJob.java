@@ -70,7 +70,8 @@ public class GatheringSpotSyncJob {
         this.emailService = emailService;
     }
 
-    @Scheduled(cron = "${place-service.job.cron:0 0 9 * * THU}")
+    @Scheduled(cron = "${place-service.job.cron:0 0 9 * * THU}",
+            zone = "${place-service.job.timezone:America/Los_Angeles}")
     public void selectWeeklyGatheringSpot() {
         if (!jobEnabled) {
             logger.debug("Weekly gathering spot job is disabled");

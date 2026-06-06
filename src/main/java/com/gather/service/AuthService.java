@@ -41,13 +41,24 @@ public class AuthService {
             UserRecord userRecord = firebaseAuth.createUser(createRequest);
             String uid = userRecord.getUid();
 
-            Map<String, Object> userDoc = new HashMap<>();
-            userDoc.put("displayName", displayName);
-            userDoc.put("email", request.getEmail());
-            userDoc.put("createdAt", FieldValue.serverTimestamp());
-            userDoc.put("lastLoginAt", FieldValue.serverTimestamp());
-            userDoc.put("hasCompletedOnboarding", false);
-            firestore.collection("users").document(uid).set(userDoc).get();
+            try {
+                Map<String, Object> userDoc = new HashMap<>();
+                userDoc.put("displayName", displayName);
+                userDoc.put("email", request.getEmail());
+                userDoc.put("createdAt", FieldValue.serverTimestamp());
+                userDoc.put("lastLoginAt", FieldValue.serverTimestamp());
+                userDoc.put("hasCompletedOnboarding", false);
+                firestore.collection("users").document(uid).set(userDoc).get();
+            } catch (InterruptedException | ExecutionException e) {
+                // The Auth user exists but the profile write failed. Roll back the Auth user so
+                // the email is freed and the client can retry, instead of being stuck at 409.
+                rollbackAuthUser(uid);
+                if (e instanceof InterruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+                logger.error("Firestore error during registration; rolled back auth user {}", uid, e);
+                throw new RuntimeException("Failed to create user profile", e);
+            }
 
             String customToken = firebaseAuth.createCustomToken(uid);
 
@@ -65,9 +76,15 @@ public class AuthService {
             }
             logger.error("Firebase Auth error during registration", e);
             throw new RuntimeException("Registration failed", e);
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Firestore error during registration", e);
-            throw new RuntimeException("Failed to create user profile", e);
+        }
+    }
+
+    private void rollbackAuthUser(String uid) {
+        try {
+            firebaseAuth.deleteUser(uid);
+            logger.warn("Rolled back orphaned auth user {} after failed profile write", uid);
+        } catch (FirebaseAuthException deleteEx) {
+            logger.error("Failed to roll back orphaned auth user {}; manual cleanup required", uid, deleteEx);
         }
     }
 
@@ -90,7 +107,11 @@ public class AuthService {
         } catch (FirebaseAuthException e) {
             logger.error("Invalid ID token during login", e);
             throw new InvalidTokenException();
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.error("Interrupted during login", e);
+            throw new RuntimeException("Failed to update login timestamp", e);
+        } catch (ExecutionException e) {
             logger.error("Firestore error during login", e);
             throw new RuntimeException("Failed to update login timestamp", e);
         }

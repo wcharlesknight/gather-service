@@ -8,7 +8,6 @@ import lombok.Data;
  */
 @Data
 public class Place {
-    private String id;
     private String providerId;
     private String provider;
     private String name;
@@ -19,5 +18,4 @@ public class Place {
     private String url;
     private Double latitude;
     private Double longitude;
-    private String priceLevel;
 }
