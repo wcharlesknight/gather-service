@@ -44,7 +44,7 @@ public class GooglePlaceSearchService implements PlaceSearchService {
                 .onErrorResume(error -> {
                     logger.error("Error searching Google Places: {}", error.getMessage());
                     return Mono.just(Collections.emptyList());
-                });
+                }); 
     }
 
     @Override

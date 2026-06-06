@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 public class CityJobConfig {
     @DocumentId
     private String id;
+    private String cityId;   // matches location.cityId on user docs (e.g. "seattle", "tacoma")
     private String name;
     private String location;
     private String topic;

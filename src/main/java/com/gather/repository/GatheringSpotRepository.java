@@ -33,9 +33,12 @@ public class GatheringSpotRepository {
             }
             logger.info("Saved gathering spot: {} for city: {}", spot.getBusinessName(), spot.getCityId());
             return spot;
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error saving gathering spot", e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.error("Interrupted while saving gathering spot", e);
+            throw new RuntimeException("Failed to save gathering spot", e);
+        } catch (ExecutionException e) {
+            logger.error("Error saving gathering spot", e);
             throw new RuntimeException("Failed to save gathering spot", e);
         }
     }
@@ -55,9 +58,12 @@ public class GatheringSpotRepository {
                 spots.add(document.toObject(GatheringSpot.class));
             }
             return spots;
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error fetching recent gathering spots for city: {}", cityId, e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.error("Interrupted while fetching recent gathering spots for city: {}", cityId, e);
+            return new ArrayList<>();
+        } catch (ExecutionException e) {
+            logger.error("Error fetching recent gathering spots for city: {}", cityId, e);
             return new ArrayList<>();
         }
     }
@@ -85,9 +91,12 @@ public class GatheringSpotRepository {
                     })
                     .filter(id -> id != null)
                     .collect(Collectors.toList());
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error fetching recent place IDs for provider {} in city: {}", provider, cityId, e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.error("Interrupted while fetching recent place IDs for provider {} in city: {}", provider, cityId, e);
+            return new ArrayList<>();
+        } catch (ExecutionException e) {
+            logger.error("Error fetching recent place IDs for provider {} in city: {}", provider, cityId, e);
             return new ArrayList<>();
         }
     }
@@ -106,9 +115,12 @@ public class GatheringSpotRepository {
                 spots.add(document.toObject(GatheringSpot.class));
             }
             return spots;
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error fetching all gathering spots for city: {}", cityId, e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.error("Interrupted while fetching all gathering spots for city: {}", cityId, e);
+            return new ArrayList<>();
+        } catch (ExecutionException e) {
+            logger.error("Error fetching all gathering spots for city: {}", cityId, e);
             return new ArrayList<>();
         }
     }
@@ -123,9 +135,11 @@ public class GatheringSpotRepository {
                     )
                     .get();
             logger.info("Marked notification sent for spot: {}", spotId);
-        } catch (InterruptedException | ExecutionException e) {
-            logger.error("Error updating notification status for spot: {}", spotId, e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            logger.error("Interrupted while updating notification status for spot: {}", spotId, e);
+        } catch (ExecutionException e) {
+            logger.error("Error updating notification status for spot: {}", spotId, e);
         }
     }
 }

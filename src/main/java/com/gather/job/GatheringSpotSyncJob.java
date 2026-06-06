@@ -3,8 +3,11 @@ package com.gather.job;
 import com.gather.model.domain.CityJobConfig;
 import com.gather.model.domain.GatheringSpot;
 import com.gather.model.domain.Place;
+import com.gather.model.domain.UserProfile;
 import com.gather.repository.CityRepository;
 import com.gather.repository.GatheringSpotRepository;
+import com.gather.repository.UserRepository;
+import com.gather.service.EmailService;
 import com.gather.service.PlaceSearchService;
 import com.gather.service.PushNotificationService;
 import org.slf4j.Logger;
@@ -13,6 +16,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 import java.util.Random;
@@ -30,6 +34,8 @@ public class GatheringSpotSyncJob {
     private final PushNotificationService pushNotificationService;
     private final CityRepository cityRepository;
     private final GatheringSpotRepository gatheringSpotRepository;
+    private final UserRepository userRepository;
+    private final EmailService emailService;
     private final Random random = new Random();
 
     @Value("${place-service.job.enabled:true}")
@@ -53,11 +59,15 @@ public class GatheringSpotSyncJob {
     public GatheringSpotSyncJob(@Qualifier("activePlaceSearchService") PlaceSearchService placeSearchService,
                                 PushNotificationService pushNotificationService,
                                 CityRepository cityRepository,
-                                GatheringSpotRepository gatheringSpotRepository) {
+                                GatheringSpotRepository gatheringSpotRepository,
+                                UserRepository userRepository,
+                                EmailService emailService) {
         this.placeSearchService = placeSearchService;
         this.pushNotificationService = pushNotificationService;
         this.cityRepository = cityRepository;
         this.gatheringSpotRepository = gatheringSpotRepository;
+        this.userRepository = userRepository;
+        this.emailService = emailService;
     }
 
     @Scheduled(cron = "${place-service.job.cron:0 0 9 * * THU}")
@@ -72,7 +82,7 @@ public class GatheringSpotSyncJob {
 
         try {
             List<CityJobConfig> enabledCities = cityRepository.findAllEnabled();
-
+            
             if (!enabledCities.isEmpty()) {
                 logger.info("Found {} enabled cities in Firestore", enabledCities.size());
                 for (CityJobConfig city : enabledCities) {
@@ -91,9 +101,11 @@ public class GatheringSpotSyncJob {
         logger.info("Processing gathering spot for city: {} using {}", city.getName(),
                 placeSearchService.getProviderName());
 
-        placeSearchService.searchPlaces(city.getLocation(), city.getSearchTerm(), city.getSearchLimit())
+        int limit = city.getSearchLimit() != null ? city.getSearchLimit() : searchLimit;
+        placeSearchService.searchPlaces(city.getLocation(), city.getSearchTerm(), limit)
+                .publishOn(Schedulers.boundedElastic())
                 .subscribe(
-                        places -> processAndNotify(places, city.getId(), city.getTopic()),
+                        places -> processAndNotify(places, city.getCityId(), city.getTopic()),
                         error -> logger.error("Error during gathering spot job for {}: {}",
                                 city.getName(), error.getMessage())
                 );
@@ -101,6 +113,7 @@ public class GatheringSpotSyncJob {
 
     private void processDefaultCity() {
         placeSearchService.searchPlaces(defaultLocation, defaultTerm, searchLimit)
+                .publishOn(Schedulers.boundedElastic())
                 .subscribe(
                         places -> processAndNotify(places, null, notificationTopic),
                         error -> logger.error("Error during weekly gathering spot job: {}", error.getMessage())
@@ -137,15 +150,48 @@ public class GatheringSpotSyncJob {
             }
         }
 
-        try {
-            pushNotificationService.sendGatheringSpotNotification(selectedSpot, topic);
-            logger.info("Successfully sent gathering spot notification for: {}", selectedSpot.getName());
+        notifyUsers(selectedSpot, cityId, topic);
 
-            if (gatheringSpot != null && gatheringSpot.getId() != null) {
-                gatheringSpotRepository.markNotificationSent(gatheringSpot.getId());
+        if (gatheringSpot != null && gatheringSpot.getId() != null) {
+            gatheringSpotRepository.markNotificationSent(gatheringSpot.getId());
+        }
+    }
+
+    private void notifyUsers(Place place, String cityId, String topic) {
+        if (cityId == null) {
+            logger.warn("cityId is null — city document is missing the 'cityId' field. Falling back to topic broadcast. Add cityId to the Firestore city document.");
+            pushNotificationService.sendGatheringSpotNotification(place, topic);
+            return;
+        }
+
+        List<UserProfile> users = userRepository.findByCityId(cityId);
+
+        if (users.isEmpty()) {
+            logger.info("No users found for city {}, falling back to topic broadcast", cityId);
+            pushNotificationService.sendGatheringSpotNotification(place, topic);
+            return;
+        }
+
+        boolean anyWithoutToken = false;
+        for (UserProfile user : users) {
+            if (user.getFcmToken() != null && !user.getFcmToken().isBlank()) {
+                pushNotificationService.sendToToken(place, user.getFcmToken());
+            } else {
+                anyWithoutToken = true;
             }
-        } catch (Exception e) {
-            logger.error("Failed to send push notification", e);
+
+            if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                try {
+                    emailService.sendGatheringSpotEmail(place, user.getEmail(), user.getDisplayName());
+                } catch (Exception e) {
+                    logger.error("Failed to send email to {}: {}", user.getEmail(), e.getMessage());
+                }
+            }
+        }
+
+        if (anyWithoutToken) {
+            logger.info("Some users in {} have no FCM token, sending topic broadcast as fallback", cityId);
+            pushNotificationService.sendGatheringSpotNotification(place, topic);
         }
     }
 
