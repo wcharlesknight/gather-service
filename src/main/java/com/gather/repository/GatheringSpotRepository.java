@@ -12,7 +12,6 @@ import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 @Repository
 public class GatheringSpotRepository {
@@ -92,7 +91,7 @@ public class GatheringSpotRepository {
                         return null;
                     })
                     .filter(id -> id != null)
-                    .collect(Collectors.toList());
+                    .toList();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.error("Interrupted while fetching recent place IDs for provider {} in city: {}", provider, cityId, e);

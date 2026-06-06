@@ -9,7 +9,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Google Places implementation of PlaceSearchService.
@@ -38,7 +37,7 @@ public class GooglePlaceSearchService implements PlaceSearchService {
                     }
                     return response.getPlaces().stream()
                             .map(this::convertToPlace)
-                            .collect(Collectors.toList());
+                            .toList();
                 })
                 .doOnSuccess(places -> logger.info("Converted {} Google Places to generic Place objects", places.size()))
                 .onErrorResume(error -> {
