@@ -196,7 +196,8 @@ public class GatheringSpotSyncJob {
         }
     }
 
-    private Place selectRandomGatheringSpot(List<Place> places, String cityId) {
+    // Package-private for unit testing of the selection + repeat-avoidance logic.
+    Place selectRandomGatheringSpot(List<Place> places, String cityId) {
         if (places == null || places.isEmpty()) {
             return null;
         }
