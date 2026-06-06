@@ -116,7 +116,7 @@ class AuthServiceTest {
         when(token.getUid()).thenReturn("uid123");
         when(token.getClaims()).thenReturn(Map.of("name", "Alice"));
         when(token.getEmail()).thenReturn("alice@example.com");
-        when(firebaseAuth.verifyIdToken("id-token")).thenReturn(token);
+        when(firebaseAuth.verifyIdToken("id-token", true)).thenReturn(token);
 
         stubFirestoreUsersDoc("uid123");
         ApiFuture<WriteResult> future = mock(ApiFuture.class);
@@ -132,7 +132,7 @@ class AuthServiceTest {
 
     @Test
     void loginThrowsInvalidTokenOnBadToken() throws Exception {
-        when(firebaseAuth.verifyIdToken("bad-token")).thenThrow(mock(FirebaseAuthException.class));
+        when(firebaseAuth.verifyIdToken("bad-token", true)).thenThrow(mock(FirebaseAuthException.class));
 
         assertThatThrownBy(() -> authService.login("bad-token"))
                 .isInstanceOf(InvalidTokenException.class);

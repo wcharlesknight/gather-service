@@ -1,11 +1,14 @@
 package com.gather.controller;
 
+import com.gather.config.security.SecurityConfig;
 import com.gather.model.dto.response.AuthResponse;
 import com.gather.service.AuthService;
+import com.google.firebase.auth.FirebaseAuth;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -17,10 +20,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
+@Import(SecurityConfig.class)
 class AuthControllerTest {
 
     @Autowired MockMvc mockMvc;
     @MockBean AuthService authService;
+    @MockBean FirebaseAuth firebaseAuth; // required by the security filter; unused on public routes
 
     @Test
     void registerReturns201WithToken() throws Exception {

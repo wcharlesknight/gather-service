@@ -90,7 +90,7 @@ public class AuthService {
 
     public AuthResponse login(String idToken) {
         try {
-            FirebaseToken decodedToken = firebaseAuth.verifyIdToken(idToken);
+            FirebaseToken decodedToken = firebaseAuth.verifyIdToken(idToken, true);
             String uid = decodedToken.getUid();
 
             Map<String, Object> updates = new HashMap<>();

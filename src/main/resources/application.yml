@@ -34,6 +34,14 @@ resend:
   from-email: ${RESEND_FROM_EMAIL:noreply@gather.app}
   enabled: ${RESEND_ENABLED:true}
 
+# Security
+# Admin-only routes (/api/admin/**, city writes) require a Firebase user with a custom
+# claim {"admin": true}. CORS is disabled by default (native mobile client needs none);
+# set a comma-separated origin allowlist if a browser client is added.
+security:
+  cors:
+    allowed-origins: ${SECURITY_CORS_ALLOWED_ORIGINS:}
+
 # Firebase Configuration for Push Notifications
 firebase:
   credentials-path: ${FIREBASE_CREDENTIALS_PATH:classpath:firebase-service-account.json}

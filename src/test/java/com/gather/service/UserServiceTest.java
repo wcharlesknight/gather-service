@@ -42,7 +42,7 @@ class UserServiceTest {
     private void stubVerifiedToken(String uid) throws FirebaseAuthException {
         FirebaseToken token = mock(FirebaseToken.class);
         when(token.getUid()).thenReturn(uid);
-        when(firebaseAuth.verifyIdToken("id-token")).thenReturn(token);
+        when(firebaseAuth.verifyIdToken("id-token", true)).thenReturn(token);
     }
 
     @Test
@@ -71,7 +71,7 @@ class UserServiceTest {
 
     @Test
     void updateLocationThrowsInvalidTokenOnBadToken() throws Exception {
-        when(firebaseAuth.verifyIdToken("bad-token")).thenThrow(mock(FirebaseAuthException.class));
+        when(firebaseAuth.verifyIdToken("bad-token", true)).thenThrow(mock(FirebaseAuthException.class));
 
         assertThatThrownBy(() -> userService.updateLocation("bad-token", "seattle"))
                 .isInstanceOf(InvalidTokenException.class);

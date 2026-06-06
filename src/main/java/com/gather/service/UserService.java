@@ -82,7 +82,7 @@ public class UserService {
 
     private String verifyToken(String idToken) {
         try {
-            FirebaseToken decoded = firebaseAuth.verifyIdToken(idToken);
+            FirebaseToken decoded = firebaseAuth.verifyIdToken(idToken, true);
             return decoded.getUid();
         } catch (FirebaseAuthException e) {
             throw new InvalidTokenException();
