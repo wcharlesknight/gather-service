@@ -34,50 +34,67 @@ public class PushNotificationService {
         }
 
         try {
-            String title = "📍 This Week's Gather Spot!";
-            String body = String.format("Meet Friday at %s - %s", place.getName(), place.getAddress());
-
-            Map<String, String> data = new HashMap<>();
-            data.put("placeId", place.getProviderId());
-            data.put("provider", place.getProvider());
-            data.put("businessName", place.getName());
-            data.put("rating", String.valueOf(place.getRating()));
-            data.put("address", place.getAddress());
-            data.put("url", place.getUrl());
-            if (place.getLatitude() != null && place.getLongitude() != null) {
-                data.put("latitude", String.valueOf(place.getLatitude()));
-                data.put("longitude", String.valueOf(place.getLongitude()));
-            }
-
-            Message message = Message.builder()
-                    .setNotification(Notification.builder()
-                            .setTitle(title)
-                            .setBody(body)
-                            .build())
-                    .putAllData(data)
-                    .setTopic(topic)
-                    .setApnsConfig(ApnsConfig.builder()
-                            .setAps(Aps.builder()
-                                    .setSound("default")
-                                    .build())
-                            .build())
-                    .setAndroidConfig(AndroidConfig.builder()
-                            .setPriority(AndroidConfig.Priority.HIGH)
-                            .setNotification(AndroidNotification.builder()
-                                    .setSound("default")
-                                    .setChannelId("weekly_recommendations")
-                                    .build())
-                            .build())
-                    .build();
-
+            Message message = buildMessageBuilder(place).setTopic(topic).build();
             String response = FirebaseMessaging.getInstance().send(message);
-            logger.info("Successfully sent push notification: {}", response);
-
+            logger.info("Successfully sent topic push notification: {}", response);
         } catch (FirebaseMessagingException e) {
-            logger.error("Failed to send push notification", e);
+            logger.error("Failed to send topic push notification", e);
             throw new RuntimeException("Failed to send push notification", e);
         } catch (IllegalStateException e) {
             logger.error("Firebase not initialized. Cannot send push notification.", e);
         }
+    }
+
+    public void sendToToken(Place place, String fcmToken) {
+        if (!firebaseEnabled) {
+            logger.warn("Firebase is disabled. Skipping push notification.");
+            return;
+        }
+
+        try {
+            Message message = buildMessageBuilder(place).setToken(fcmToken).build();
+            String response = FirebaseMessaging.getInstance().send(message);
+            logger.info("Successfully sent per-user push notification: {}", response);
+        } catch (FirebaseMessagingException e) {
+            logger.error("Failed to send per-user push notification", e);
+        } catch (IllegalStateException e) {
+            logger.error("Firebase not initialized. Cannot send push notification.", e);
+        }
+    }
+
+    private Message.Builder buildMessageBuilder(Place place) {
+        String title = "📍 This Week's Gather Spot!";
+        String body = String.format("Meet Friday at %s - %s", place.getName(), place.getAddress());
+
+        Map<String, String> data = new HashMap<>();
+        data.put("placeId", place.getProviderId());
+        data.put("provider", place.getProvider());
+        data.put("businessName", place.getName());
+        data.put("rating", String.valueOf(place.getRating()));
+        data.put("address", place.getAddress());
+        data.put("url", place.getUrl());
+        if (place.getLatitude() != null && place.getLongitude() != null) {
+            data.put("latitude", String.valueOf(place.getLatitude()));
+            data.put("longitude", String.valueOf(place.getLongitude()));
+        }
+
+        return Message.builder()
+                .setNotification(Notification.builder()
+                        .setTitle(title)
+                        .setBody(body)
+                        .build())
+                .putAllData(data)
+                .setApnsConfig(ApnsConfig.builder()
+                        .setAps(Aps.builder()
+                                .setSound("default")
+                                .build())
+                        .build())
+                .setAndroidConfig(AndroidConfig.builder()
+                        .setPriority(AndroidConfig.Priority.HIGH)
+                        .setNotification(AndroidNotification.builder()
+                                .setSound("default")
+                                .setChannelId("weekly_recommendations")
+                                .build())
+                        .build());
     }
 }
