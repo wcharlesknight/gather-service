@@ -4,8 +4,10 @@ import com.gather.exception.InvalidTokenException;
 import com.gather.model.dto.request.RegisterRequest;
 import com.gather.model.dto.response.AuthResponse;
 import com.gather.repository.FirestoreAwait;
+import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.FieldValue;
 import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.SetOptions;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
@@ -93,16 +95,34 @@ public class AuthService {
         try {
             FirebaseToken decodedToken = firebaseAuth.verifyIdToken(idToken, true);
             String uid = decodedToken.getUid();
+            String displayName = (String) decodedToken.getClaims().get("name");
+            String email = decodedToken.getEmail();
+
+            // A social sign-in (Google/Apple/Facebook/Twitter) never went through /register, so the
+            // user's Firestore profile may not exist yet. update() would fail on a missing doc, so we
+            // create-or-merge: first login provisions the profile; subsequent logins just touch
+            // lastLoginAt. The doc's prior existence tells us whether this is a brand-new user.
+            var docRef = firestore.collection("users").document(uid);
+            DocumentSnapshot snapshot = FirestoreAwait.get(docRef.get());
+            boolean isNewUser = !snapshot.exists();
 
             Map<String, Object> updates = new HashMap<>();
             updates.put("lastLoginAt", FieldValue.serverTimestamp());
-            FirestoreAwait.get(firestore.collection("users").document(uid).update(updates));
+            if (isNewUser) {
+                updates.put("displayName", displayName);
+                updates.put("email", email);
+                updates.put("provider", signInProvider(decodedToken));
+                updates.put("createdAt", FieldValue.serverTimestamp());
+                updates.put("hasCompletedOnboarding", false);
+            }
+            FirestoreAwait.get(docRef.set(updates, SetOptions.merge()));
 
-            logger.info("User login recorded: {}", uid);
+            logger.info("User login recorded: {} (newUser={})", uid, isNewUser);
             return AuthResponse.builder()
                     .uid(uid)
-                    .displayName((String) decodedToken.getClaims().get("name"))
-                    .email(decodedToken.getEmail())
+                    .displayName(displayName)
+                    .email(email)
+                    .isNewUser(isNewUser)
                     .build();
 
         } catch (FirebaseAuthException e) {
@@ -116,6 +136,23 @@ public class AuthService {
             logger.error("Firestore error during login", e);
             throw new RuntimeException("Failed to update login timestamp", e);
         }
+    }
+
+    /**
+     * Extracts the sign-in provider (e.g. "password", "google.com", "apple.com") from the token's
+     * nested {@code firebase.sign_in_provider} claim. Returns "unknown" if the claim is absent or
+     * malformed, so profile creation never fails on a missing provider.
+     */
+    @SuppressWarnings("unchecked")
+    private static String signInProvider(FirebaseToken token) {
+        Object firebaseClaim = token.getClaims().get("firebase");
+        if (firebaseClaim instanceof Map<?, ?> claims) {
+            Object provider = ((Map<String, Object>) claims).get("sign_in_provider");
+            if (provider instanceof String s) {
+                return s;
+            }
+        }
+        return "unknown";
     }
 
     public static class EmailAlreadyExistsException extends RuntimeException {}

@@ -6,7 +6,9 @@ import com.gather.model.dto.response.AuthResponse;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.DocumentReference;
+import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
+import com.google.cloud.firestore.SetOptions;
 import com.google.cloud.firestore.WriteResult;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
@@ -27,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -112,7 +115,7 @@ class AuthServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void loginRecordsTimestampAndReturnsProfile() throws Exception {
+    void loginRecordsTimestampForExistingUser() throws Exception {
         FirebaseToken token = mock(FirebaseToken.class);
         when(token.getUid()).thenReturn("uid123");
         when(token.getClaims()).thenReturn(Map.of("name", "Alice"));
@@ -120,15 +123,91 @@ class AuthServiceTest {
         when(firebaseAuth.verifyIdToken("id-token", true)).thenReturn(token);
 
         stubFirestoreUsersDoc("uid123");
-        ApiFuture<WriteResult> future = mock(ApiFuture.class);
-        when(userDoc.update(anyMap())).thenReturn(future);
-        when(future.get(anyLong(), any())).thenReturn(mock(WriteResult.class));
+        DocumentSnapshot snapshot = mock(DocumentSnapshot.class);
+        when(snapshot.exists()).thenReturn(true);
+        ApiFuture<DocumentSnapshot> getFuture = mock(ApiFuture.class);
+        when(userDoc.get()).thenReturn(getFuture);
+        when(getFuture.get(anyLong(), any())).thenReturn(snapshot);
+        ApiFuture<WriteResult> setFuture = mock(ApiFuture.class);
+        when(userDoc.set(anyMap(), any(SetOptions.class))).thenReturn(setFuture);
+        when(setFuture.get(anyLong(), any())).thenReturn(mock(WriteResult.class));
 
         AuthResponse response = authService.login("id-token");
 
         assertThat(response.getUid()).isEqualTo("uid123");
         assertThat(response.getDisplayName()).isEqualTo("Alice");
         assertThat(response.getEmail()).isEqualTo("alice@example.com");
+        assertThat(response.isNewUser()).isFalse();
+        // Existing profile: only lastLoginAt is merged, not the create-time fields.
+        verify(userDoc).set(argThat((Map<String, Object> m) ->
+                m.containsKey("lastLoginAt") && !m.containsKey("createdAt")), any(SetOptions.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void loginProvisionsProfileForNewSocialUser() throws Exception {
+        FirebaseToken token = mock(FirebaseToken.class);
+        when(token.getUid()).thenReturn("uid456");
+        when(token.getClaims()).thenReturn(Map.of(
+                "name", "Bob",
+                "firebase", Map.of("sign_in_provider", "google.com")));
+        when(token.getEmail()).thenReturn("bob@example.com");
+        when(firebaseAuth.verifyIdToken("id-token", true)).thenReturn(token);
+
+        stubFirestoreUsersDoc("uid456");
+        DocumentSnapshot snapshot = mock(DocumentSnapshot.class);
+        when(snapshot.exists()).thenReturn(false);
+        ApiFuture<DocumentSnapshot> getFuture = mock(ApiFuture.class);
+        when(userDoc.get()).thenReturn(getFuture);
+        when(getFuture.get(anyLong(), any())).thenReturn(snapshot);
+        ApiFuture<WriteResult> setFuture = mock(ApiFuture.class);
+        when(userDoc.set(anyMap(), any(SetOptions.class))).thenReturn(setFuture);
+        when(setFuture.get(anyLong(), any())).thenReturn(mock(WriteResult.class));
+
+        AuthResponse response = authService.login("id-token");
+
+        assertThat(response.isNewUser()).isTrue();
+        assertThat(response.getDisplayName()).isEqualTo("Bob");
+        // First login provisions the full profile, including provider and onboarding defaults.
+        verify(userDoc).set(argThat((Map<String, Object> m) ->
+                "google.com".equals(m.get("provider"))
+                        && Boolean.FALSE.equals(m.get("hasCompletedOnboarding"))
+                        && m.containsKey("createdAt")
+                        && m.containsKey("lastLoginAt")), any(SetOptions.class));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void loginProvisionsProfileForAppleUser() throws Exception {
+        FirebaseToken token = mock(FirebaseToken.class);
+        when(token.getUid()).thenReturn("uid789");
+        when(token.getClaims()).thenReturn(Map.of(
+                "name", "Charlie",
+                "firebase", Map.of("sign_in_provider", "apple.com")));
+        when(token.getEmail()).thenReturn("charlie@example.com");
+        when(firebaseAuth.verifyIdToken("id-token", true)).thenReturn(token);
+
+        stubFirestoreUsersDoc("uid789");
+        DocumentSnapshot snapshot = mock(DocumentSnapshot.class);
+        when(snapshot.exists()).thenReturn(false);
+        ApiFuture<DocumentSnapshot> getFuture = mock(ApiFuture.class);
+        when(userDoc.get()).thenReturn(getFuture);
+        when(getFuture.get(anyLong(), any())).thenReturn(snapshot);
+        ApiFuture<WriteResult> setFuture = mock(ApiFuture.class);
+        when(userDoc.set(anyMap(), any(SetOptions.class))).thenReturn(setFuture);
+        when(setFuture.get(anyLong(), any())).thenReturn(mock(WriteResult.class));
+
+        AuthResponse response = authService.login("id-token");
+
+        assertThat(response.isNewUser()).isTrue();
+        assertThat(response.getDisplayName()).isEqualTo("Charlie");
+        assertThat(response.getEmail()).isEqualTo("charlie@example.com");
+        // Apple sign-in also provisions the full profile with the apple.com provider.
+        verify(userDoc).set(argThat((Map<String, Object> m) ->
+                "apple.com".equals(m.get("provider"))
+                        && Boolean.FALSE.equals(m.get("hasCompletedOnboarding"))
+                        && m.containsKey("createdAt")
+                        && m.containsKey("lastLoginAt")), any(SetOptions.class));
     }
 
     @Test
