@@ -12,7 +12,6 @@ import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.stream.Collectors;
 
 @Repository
 public class GatheringSpotRepository {
@@ -30,10 +29,10 @@ public class GatheringSpotRepository {
             if (spot.getId() == null) {
                 // add() returns the reference to the new auto-ID document; capture it so the
                 // caller (e.g. markNotificationSent) has the persisted document ID.
-                DocumentReference ref = firestore.collection(COLLECTION_NAME).add(spot).get();
+                DocumentReference ref = FirestoreAwait.get(firestore.collection(COLLECTION_NAME).add(spot));
                 spot.setId(ref.getId());
             } else {
-                firestore.collection(COLLECTION_NAME).document(spot.getId()).set(spot).get();
+                FirestoreAwait.get(firestore.collection(COLLECTION_NAME).document(spot.getId()).set(spot));
             }
             logger.info("Saved gathering spot: {} for city: {}", spot.getBusinessName(), spot.getCityId());
             return spot;
@@ -49,12 +48,11 @@ public class GatheringSpotRepository {
 
     public List<GatheringSpot> findRecentByCityId(String cityId, int limit) {
         try {
-            List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
+            List<QueryDocumentSnapshot> documents = FirestoreAwait.get(firestore.collection(COLLECTION_NAME)
                     .whereEqualTo("cityId", cityId)
                     .orderBy("selectedAt", Query.Direction.DESCENDING)
                     .limit(limit)
-                    .get()
-                    .get()
+                    .get())
                     .getDocuments();
 
             List<GatheringSpot> spots = new ArrayList<>();
@@ -77,12 +75,11 @@ public class GatheringSpotRepository {
         long cutoffTime = System.currentTimeMillis() - millisecondsBack;
 
         try {
-            List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
+            List<QueryDocumentSnapshot> documents = FirestoreAwait.get(firestore.collection(COLLECTION_NAME)
                     .whereEqualTo("cityId", cityId)
                     .whereEqualTo("provider", provider)
                     .whereGreaterThan("selectedAt", cutoffTime)
-                    .get()
-                    .get()
+                    .get())
                     .getDocuments();
 
             return documents.stream()
@@ -94,7 +91,7 @@ public class GatheringSpotRepository {
                         return null;
                     })
                     .filter(id -> id != null)
-                    .collect(Collectors.toList());
+                    .toList();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             logger.error("Interrupted while fetching recent place IDs for provider {} in city: {}", provider, cityId, e);
@@ -107,11 +104,10 @@ public class GatheringSpotRepository {
 
     public List<GatheringSpot> findAllByCityId(String cityId) {
         try {
-            List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
+            List<QueryDocumentSnapshot> documents = FirestoreAwait.get(firestore.collection(COLLECTION_NAME)
                     .whereEqualTo("cityId", cityId)
                     .orderBy("selectedAt", Query.Direction.DESCENDING)
-                    .get()
-                    .get()
+                    .get())
                     .getDocuments();
 
             List<GatheringSpot> spots = new ArrayList<>();
@@ -131,13 +127,12 @@ public class GatheringSpotRepository {
 
     public void markNotificationSent(String spotId) {
         try {
-            firestore.collection(COLLECTION_NAME)
+            FirestoreAwait.get(firestore.collection(COLLECTION_NAME)
                     .document(spotId)
                     .update(
                             "notificationSent", true,
                             "notificationSentAt", System.currentTimeMillis()
-                    )
-                    .get();
+                    ));
             logger.info("Marked notification sent for spot: {}", spotId);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

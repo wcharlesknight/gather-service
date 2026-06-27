@@ -24,10 +24,9 @@ public class UserRepository {
 
     public List<UserProfile> findByCityId(String cityId) {
         try {
-            List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
+            List<QueryDocumentSnapshot> documents = FirestoreAwait.get(firestore.collection(COLLECTION_NAME)
                     .whereEqualTo("location.cityId", cityId)
-                    .get()
-                    .get()
+                    .get())
                     .getDocuments();
 
             List<UserProfile> users = new ArrayList<>();

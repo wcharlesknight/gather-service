@@ -29,4 +29,12 @@ public class GatheringSpotService {
     public List<String> getRecentPlaceIds(String cityId, String provider, int weeks) {
         return gatheringSpotRepository.findRecentPlaceIds(cityId, provider, weeks);
     }
+
+    public GatheringSpot save(GatheringSpot spot) {
+        return gatheringSpotRepository.save(spot);
+    }
+
+    public void markNotificationSent(String spotId) {
+        gatheringSpotRepository.markNotificationSent(spotId);
+    }
 }

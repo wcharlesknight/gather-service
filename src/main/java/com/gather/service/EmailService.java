@@ -4,6 +4,7 @@ import com.gather.model.domain.Place;
 import com.resend.Resend;
 import com.resend.core.exception.ResendException;
 import com.resend.services.emails.model.CreateEmailOptions;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,19 +24,27 @@ public class EmailService {
     @Value("${resend.enabled:true}")
     private boolean enabled;
 
+    // Created once and reused, rather than per send, so the underlying HTTP client can pool.
+    private Resend resend;
+
+    @PostConstruct
+    void init() {
+        if (apiKey != null && !apiKey.isBlank()) {
+            this.resend = new Resend(apiKey);
+        }
+    }
+
     public void sendGatheringSpotEmail(Place place, String toEmail, String displayName) {
         if (!enabled) {
             logger.warn("Resend is disabled. Skipping email to {}", maskEmail(toEmail));
             return;
         }
-        if (apiKey == null || apiKey.isBlank()) {
+        if (resend == null) {
             logger.warn("RESEND_API_KEY not set. Skipping email to {}", maskEmail(toEmail));
             return;
         }
 
         try {
-            Resend resend = new Resend(apiKey);
-
             CreateEmailOptions email = CreateEmailOptions.builder()
                     .from(fromEmail)
                     .to(toEmail)

@@ -25,10 +25,9 @@ public class CityRepository {
 
     public List<CityJobConfig> findAllEnabled() {
         try {
-            List<QueryDocumentSnapshot> documents = firestore.collection(COLLECTION_NAME)
+            List<QueryDocumentSnapshot> documents = FirestoreAwait.get(firestore.collection(COLLECTION_NAME)
                     .whereEqualTo("enabled", true)
-                    .get()
-                    .get()
+                    .get())
                     .getDocuments();
 
             List<CityJobConfig> cities = new ArrayList<>();
@@ -48,10 +47,9 @@ public class CityRepository {
 
     public Optional<CityJobConfig> findById(String id) {
         try {
-            CityJobConfig city = firestore.collection(COLLECTION_NAME)
+            CityJobConfig city = FirestoreAwait.get(firestore.collection(COLLECTION_NAME)
                     .document(id)
-                    .get()
-                    .get()
+                    .get())
                     .toObject(CityJobConfig.class);
             return Optional.ofNullable(city);
         } catch (InterruptedException e) {
@@ -68,9 +66,9 @@ public class CityRepository {
         try {
             if (city.getId() == null) {
                 city.setCreatedAt(System.currentTimeMillis());
-                firestore.collection(COLLECTION_NAME).add(city).get();
+                FirestoreAwait.get(firestore.collection(COLLECTION_NAME).add(city));
             } else {
-                firestore.collection(COLLECTION_NAME).document(city.getId()).set(city).get();
+                FirestoreAwait.get(firestore.collection(COLLECTION_NAME).document(city.getId()).set(city));
             }
             logger.info("Saved city: {}", city.getName());
             return city;
@@ -86,7 +84,7 @@ public class CityRepository {
 
     public void delete(String id) {
         try {
-            firestore.collection(COLLECTION_NAME).document(id).delete().get();
+            FirestoreAwait.get(firestore.collection(COLLECTION_NAME).document(id).delete());
             logger.info("Deleted city with ID: {}", id);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

@@ -3,6 +3,7 @@ package com.gather.service;
 import com.gather.exception.InvalidTokenException;
 import com.gather.exception.UnknownCityException;
 import com.gather.model.dto.response.LocationResponse;
+import com.gather.repository.UserRepository;
 import com.google.api.core.ApiFuture;
 import com.google.cloud.firestore.CollectionReference;
 import com.google.cloud.firestore.DocumentReference;
@@ -19,6 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -30,13 +33,14 @@ class UserServiceTest {
     @Mock Firestore firestore;
     @Mock CollectionReference users;
     @Mock DocumentReference userDoc;
+    @Mock UserRepository userRepository;
 
     private UserService userService;
 
     @BeforeEach
     void setUp() {
         // CityRegistry has no dependencies; use the real one so we exercise the real city list.
-        userService = new UserService(firebaseAuth, firestore, new CityRegistry());
+        userService = new UserService(firebaseAuth, firestore, new CityRegistry(), userRepository);
     }
 
     private void stubVerifiedToken(String uid) throws FirebaseAuthException {
@@ -53,7 +57,7 @@ class UserServiceTest {
         when(users.document("uid123")).thenReturn(userDoc);
         ApiFuture<WriteResult> future = mock(ApiFuture.class);
         when(userDoc.update(anyMap())).thenReturn(future);
-        when(future.get()).thenReturn(mock(WriteResult.class));
+        when(future.get(anyLong(), any())).thenReturn(mock(WriteResult.class));
 
         LocationResponse response = userService.updateLocation("id-token", "seattle");
 

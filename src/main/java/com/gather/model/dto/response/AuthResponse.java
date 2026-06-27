@@ -10,4 +10,6 @@ public class AuthResponse {
     private String uid;
     private String displayName;
     private String email;
+    /** True when this login created the user's profile for the first time (e.g. a new social sign-in). */
+    private boolean isNewUser;
 }
